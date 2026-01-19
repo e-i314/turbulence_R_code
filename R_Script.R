@@ -39,17 +39,7 @@ pole_1hz_path <- file.path(dataset_root, "raw", "pole_ULSA_PRO",
                            "ULSA_PRO_1hz_20250114_20251207.csv")
 pole_1hz <- readr::read_csv(pole_1hz_path, show_col_types = FALSE)
 
-# --- TriSonica (10 Hz) ---
-tri_path <- file.path(dataset_root, "raw", "drone_Trisonica",
-                           "wx_data_20251207_125156_125400-130959.csv")
-tri <- readr::read_csv(tri_path, show_col_types = FALSE)
 
-
-# --- ULSA PRO (10 Hz) ---
-
-pole_path <- file.path(dataset_root, "raw", "pole_ULSA_PRO",
-                      "ULSA_PRO_10hz_20251207_20251218","wind_2025-12-07.csv")
-pole <- readr::read_csv(pole_path, show_col_types = FALSE)
 
 # ----------------------------
 # 0. to_1Hz
@@ -524,9 +514,9 @@ ggplot() +
     linewidth = .8
   ) +
   scale_colour_manual(
-    name = NULL,   # 凡例タイトルなし（学会向け）
+    name = NULL,   
     values = c(
-      "Normal"  = "#0072B2",  # 学会標準ブルー
+      "Normal"  = "#0072B2",  
       "Laplace" = "black"
     )
   ) +
@@ -573,7 +563,7 @@ ggplot() +
     linewidth = 0.5
   ) +
   scale_colour_manual(
-    name = NULL,  # 凡例タイトルなし（学会向け）
+    name = NULL,  
     values = c("Normal" = "#0072B2", "Laplace" = "black")
   ) +
   scale_shape_manual(
@@ -692,11 +682,12 @@ ggplot(b_df, aes(x = b)) +
 
 
 # Caliculate fig_4
-# ---- parameter ----
+# ---- Set parameter ----
 dt_list  <- c(0.1, 0.2, 0.5, 1, 2, 5, 10)   # Δt [s]
 win_sec  <- 600                              # window
 fs       <- 10                               # 10 Hz sampling
-min_mean_wind <- 1.0                         # minimum wind speed
+min_mean_wind <- 1.0                         # minimum wind speed 
+# 平均風速が 1m/s 未満の窓は，計測分解能およびノイズの影響が支配的となることを避けるため除外した．
 min_pairs <- 1000                            # 
 
 
@@ -769,6 +760,8 @@ process_one_file <- function(file){
   res
 }
 
+
+
 # Load files in pole_ULSA_PRO/ULSA_PRO_10hz_20251207_20251218  Folder
 
 folder <- file.path(dataset_root, "raw", "pole_ULSA_PRO",
@@ -780,10 +773,14 @@ result_all <- rbindlist(lapply(files, process_one_file), fill = TRUE)
 plot_dt <- copy(result_all)
 plot_dt[, delta_t_f := factor(delta_t, levels = sort(unique(delta_t)))]
 
-# windows number
+# Show total windows  1window = 7Delta_t
 nrow(plot_dt)/7
+# 解析に際しては， 10 分窓ごとにデータを区切り，十分なサンプル数を確保しつつ， 
+#∆t = 0.1–10 s の範囲における時間増分スケール解析が安定して行えるよう設定した（n = 347 窓）．
 
-# Draw fig 4 
+
+# Draw fig 4
+#Box-and-whisker plots of the Laplace turbulence index b(∆t) for different time lags ∆t, evaluated over nonoverlapping 10-min windows. 
 ggplot(plot_dt, aes(x = delta_t_f, y = b)) +
   geom_boxplot(
     width = 0.6
@@ -805,7 +802,7 @@ ggplot(plot_dt, aes(x = delta_t_f, y = b)) +
 
 
 
-# ---- b案（スケーリング指数）用設定 ----
+# （スケーリング指数）用設定 ----
 dt_fit_range <- c(0.5, 10)   # フィットに使う Δt 範囲 [s]
 min_points   <- 4            # 回帰に必要な最小Δt点数
 
@@ -861,9 +858,9 @@ zeta_dt <- result_all[
     st <- estimate_zeta1_stats(delta_t, b)
     .(
       zeta1     = st$zeta1,
-      r2        = st$r2,       # ★追加（回帰の当てはまり）
-      r_fit     = st$r_fit,    # ★追加（符号付き相関）
-      n_fit     = st$n_fit,    # ★追加（回帰に使った点数）
+      r2        = st$r2,       # （回帰の当てはまり）
+      r_fit     = st$r_fit,    # （符号付き相関）
+      n_fit     = st$n_fit,    # （回帰に使った点数）
       mean_wind = mean(mean_wind, na.rm = TRUE)
     )
   },
@@ -873,6 +870,8 @@ zeta_dt <- result_all[
 zeta_dt <- zeta_dt[is.finite(zeta1) & is.finite(r2)]
 
 summary(zeta_dt$zeta1)
+# 本データ（n = 347 窓）において推定された ζ1 は 0.3146–0.5000 の範囲に分布し，
+#中央値は 0.4080，四分位範囲は 0.3848–0.4271 であった．
 
 quantile(zeta_dt$zeta1, probs = c(0.25, 0.5, 0.75))
 
@@ -901,6 +900,8 @@ spearman_res <- cor.test(zeta_dt$mean_wind, zeta_dt$zeta1, method = "spearman", 
 pearson_res
 spearman_res
 
+# ζ1 は平均風速と有意な負の相関を示した（Pearsonr = −0.474， 95%CI [−0.552, −0.388]， p = 7.53×10−21； Spearman ρ = −0.463， p = 7.97×10−20）．
+
 
 cat("n =", nrow(zeta_dt), "\n")
 cat("Pearson r =", unname(pearson_res$estimate),
@@ -913,9 +914,7 @@ cat("Spearman rho =", unname(spearman_res$estimate),
 summary(zeta_dt$r2)
 quantile(zeta_dt$r2, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
 
-# 参考：R^2 が低い窓がどれくらいあるか（閾値は好みで調整）
-mean(zeta_dt$r2 < 0.8, na.rm = TRUE)  # 0.8未満の割合
-mean(zeta_dt$r2 < 0.9, na.rm = TRUE)  # 0.9未満の割合
+# また，図 5 では各窓の回帰を表す指標として決定係数 R2 も併せて示した． R2 は 0.9166–0.9952（中央値 0.9733）と全体として非常に高い事が確認された．
 
 cor.test(zeta_dt$mean_wind, zeta_dt$r2, method = "spearman", exact = FALSE)
 cor.test(zeta_dt$mean_wind, zeta_dt$r2, method = "pearson")
@@ -933,6 +932,8 @@ zeta_dt[, .(
 
 
 # Draw fig5
+# Relationship between the scaling exponent ζ1 and the mean wind speed evaluated over non-overlapping 10-min windows.
+
 ggplot(zeta_dt, aes(mean_wind, zeta1, color=r2)) +
   geom_point(size=1.5) +
   labs(x="Wind speed (m/s)", y=expression(zeta[1]), color=expression(R^2)) +
@@ -945,7 +946,7 @@ ggplot(zeta_dt, aes(mean_wind, zeta1, color=r2)) +
 
 
 
-### Chap 7.1
+### Chap 7
 
 
 process_trisonica <- function(file,
@@ -1040,7 +1041,8 @@ lowpass_uv <- function(x, fs, fc, order = 4) {
 }
 
 
-folder <- "D:/Dropbox/Reserch/0.2Data/Hamamatsu/turbulence_dataset_v1.0/raw/drone_Trisonica"
+
+folder <- file.path(dataset_root, "raw", "drone_Trisonica")
 files  <- list.files(folder, pattern="\\.csv$", full.names=TRUE)
 
 res <- lapply(files, process_trisonica)
@@ -1071,15 +1073,22 @@ ggplot(Trisonica_TS[file == unique(file)[7]],
   ) +
   theme_bw()
 
-
+# これらの 1 s 代表値を比較した結果， raw と filtered の間に顕著な差は認められず，
+#ローパスフィルタ処理による影響が僅少であることが確認されたため，本節では両者の時系列を図として示すことは省略する．
 
 
 #################
 
 # ---- ファイルパス ----
-file_drone <- "D:/Dropbox/Reserch/0.2Data/Hamamatsu/turbulence_dataset_v1.0/raw/drone_Trisonica/wx_data_20251209_130549_130900-132859.csv"
 
-file_pole  <- "D:/Dropbox/Reserch/0.2Data/Hamamatsu/turbulence_dataset_v1.0/raw/pole_ULSA_PRO/ULSA_PRO_10hz_20251207_20251218/wind_2025-12-09.csv"
+
+file_drone <- file.path(dataset_root, "raw", "drone_Trisonica",
+                        "wx_data_20251209_130549_130900-132859.csv")
+
+
+file_pole <- file.path(dataset_root, "raw", "pole_ULSA_PRO",
+                    "ULSA_PRO_10hz_20251207_20251218","wind_2025-12-09.csv")
+
 
 # ---- 読み込み ----
 df_drone <- read_csv(file_drone, show_col_types = FALSE)
@@ -1133,24 +1142,22 @@ df_drone_10min <- df_drone_10min %>%
     t1s = t0 + seconds(sec)
   )
 
-df_drone_filt <- df_drone_filt %>%
-  mutate(
-    sec = (row_number() - 1) %/% fs,
-    t1s = t0 + seconds(sec)
-  )
+
 
 df_drone_filt <- df_drone_10min %>%
   mutate(
+    U = as.numeric(U),
+    V = as.numeric(V),
     u_f = filtfilt(bf, U),
     v_f = filtfilt(bf, V)
   )
 
-# 念のため数値化
 df_drone_10min <- df_drone_10min %>%
   mutate(
     U = as.numeric(U),
     V = as.numeric(V)
   )
+
 
 # raw 1Hz：U,V の1秒中央値 → ws（sqrtは最後に1回）
 drone_raw_1s <- df_drone_10min %>%
@@ -1216,50 +1223,12 @@ ggplot(df_plot2, aes(x = t1s, y = ws, color = type)) +
         legend.text = element_text(size = 9 * 1.3))
 
 
-df_all <- bind_rows(
-  drone_filt_1s %>% mutate(Device = "Drone"),
-  pole_1s  %>% mutate(Device = "Pole")
-) %>%
-  select(file, Device, ws)
-
-df_all <- df_all %>%
-  arrange(t1s) %>%
-  mutate(
-    dt = as.numeric(difftime(t1s, lag(t1s), units = "secs")),
-    case_id = cumsum(is.na(dt) | dt > 10)
-  )
-
-
-library(ggplot2)
-
-ggplot(df_all, aes(x = factor(case_id), y = ws, fill = Device)) +
-  geom_boxplot(
-    width = 0.65,
-    outlier.size = 0.4,
-    linewidth = 0.4,
-    position = position_dodge(width = 0.7)
-  ) +
-  scale_fill_manual(
-    values = c("Drone" = "gray70", "Pole" = "steelblue")
-  ) +
-  labs(
-    x = "Dataset (case ID)",
-    y = "Wind speed [m/s]",
-    fill = NULL
-  ) +
-  theme_bw(base_size = 10) +
-  theme(
-    legend.position = "top",
-    panel.grid.minor = element_blank()
-  )
 
 
 ############### 複数ファイルを処理する
 
-
-
-dir_drone <- "D:/Dropbox/Reserch/0.2Data/Hamamatsu/turbulence_dataset_v1.0/raw/drone_Trisonica"
-dir_pole  <- "D:/Dropbox/Reserch/0.2Data/Hamamatsu/turbulence_dataset_v1.0/raw/pole_ULSA_PRO/ULSA_PRO_10hz_select"
+dir_drone <- file.path(dataset_root, "raw", "drone_Trisonica")
+dir_pole  <- file.path(dataset_root, "raw", "pole_ULSA_PRO","ULSA_PRO_10hz_select")
 
 files_drone <- list.files(dir_drone, pattern="\\.csv$", full.names=TRUE)
 files_pole  <- list.files(dir_pole,  pattern="\\.csv$", full.names=TRUE)
@@ -1394,7 +1363,7 @@ df_plot_box <- df_all %>%
   )
 
 
-# fig 7-4_1
+# fig 7
 ggplot(df_plot_box, aes(x = case, y = ws, fill = Device)) +
   geom_boxplot(
     position = position_dodge(width = 0.7),
@@ -1621,7 +1590,7 @@ df_case_legend <- df_b_compare %>%
 
 legend_text <- paste(df_case_legend$label, collapse = "\n")
 
-# Fig 8 7-4_1
+# Fig 8
 ggplot(df_b_compare,
        aes(x = b_pole, y = b_drone, color = component)) +
   
@@ -1673,6 +1642,10 @@ ggplot(df_b_compare,
   ) +
   
   theme_bw(base_size = 13)
+
+
+
+
 
 
 
