@@ -16,8 +16,7 @@ The workflow downloads the public dataset from Zenodo, preprocesses the time ser
 
 ## Contents
 
-- **R script**: `analysis.R` (name your script as you like)
-- **Outputs**: figures are displayed interactively; you may add `ggsave()` to store PNG/EPS/PDF.
+- **R script**: 
 
 ---
 
