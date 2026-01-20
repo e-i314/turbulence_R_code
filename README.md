@@ -69,4 +69,5 @@ If you already downloaded the dataset manually, set:
 
 dataset_root <- "PATH/TO/zenodo_turbulence_dataset"
 
-
+You can see 24H observation data
+http://ito-lab.mobi:3000/public-dashboards/23d519078ada48128335348fc2730135
