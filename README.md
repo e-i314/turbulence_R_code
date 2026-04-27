@@ -3,7 +3,7 @@
 
 This repository provides an R script to reproduce the main analyses and figures for the study:
 
-**“Proposal of a Laplace Turbulence Index (LTI) Based on the Non-Gaussianity of Temporal Wind Velocity Increments.”**
+**“Proposal of a Laplace Turbulence Index Based on the Non-Gaussianity of Temporal Wind Velocity Increments.”**
 
 The workflow downloads the public dataset from Zenodo, preprocesses the time series, and generates figures that evaluate:
 - the non-Gaussian (Laplace-type) behavior of wind-velocity increments,
