@@ -538,7 +538,7 @@ min_n  <- 50
 
 b_list <- list()   
 
-# Take 60min for caliculate
+################ Take 60min for caliculate ############################
 for(w in unique(df2_std$window)){
   
   dat <- df2_std %>%
@@ -599,7 +599,145 @@ summ_stats <- win_summary %>%
 
 summ_stats
 
-################# Fig2 ################
+
+
+
+# 各10分窓の平均風速を計算 追加計算　2026/6/27
+wind_class_df <- df2_std %>%
+  mutate(
+    window = as.numeric(window)
+  ) %>%
+  group_by(window) %>%
+  summarise(
+    mean_speed = mean(sqrt(u^2 + v^2), na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    wind_class = case_when(
+      mean_speed < 1 ~ "Low wind (<1 m/s)",
+      mean_speed < 3 ~ "Moderate wind (1–3 m/s)",
+      TRUE           ~ "High wind (>=3 m/s)"
+    )
+  )
+
+# Facet の順番を指定
+wind_order <- c(
+  "Low wind (<1 m/s)",
+  "Moderate wind (1–3 m/s)",
+  "High wind (>=3 m/s)"
+)
+
+# wind_class_df の wind_class を factor 化
+wind_class_df <- wind_class_df %>%
+  mutate(
+    window = as.numeric(window),
+    wind_class = factor(wind_class, levels = wind_order)
+  )
+
+# 各風速階級の window 数を数える
+wind_label_df <- wind_class_df %>%
+  group_by(wind_class) %>%
+  summarise(
+    n_win = n_distinct(window),
+    .groups = "drop"
+  ) %>%
+  arrange(wind_class) %>%
+  mutate(
+    wind_label = 
+      as.character(wind_class)
+
+  )
+
+# wind_label の順番を明示
+wind_label_order <- wind_label_df$wind_label
+
+# b_df に平均風速階級とラベルを付与
+b_df2 <- b_df %>%
+  mutate(window = as.numeric(window)) %>%
+  left_join(wind_class_df, by = "window") %>%
+  left_join(wind_label_df, by = "wind_class") %>%
+  mutate(
+    wind_class = factor(wind_class, levels = wind_order),
+    wind_label = factor(wind_label, levels = wind_label_order)
+  )
+
+
+
+
+
+
+################# Fig2 外れ値を除外してプロットする################
+
+
+
+
+ggplot(b_df2, aes(x = factor(angle), y = b)) +
+  geom_boxplot(outliers = FALSE) +
+  facet_wrap(~ wind_label, ncol = 1, scales = "free_y") +
+  labs(
+    x = "Projection angle from nose direction (deg)",
+    y = "LTI: b (m/s)"
+  ) +
+  scale_y_continuous(
+    limits = c(0, NA),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_bw() +
+  theme(
+    axis.title = element_text(size = 9 * 1.3),
+    axis.text  = element_text(size = 9 * 1.3),
+    axis.text.x = element_text(
+      angle = 90,
+      vjust = 0.5,
+      hjust = 1
+    ),
+    strip.text = element_text(size = 9 * 1.3)
+  )
+
+
+#########################################################
+ggplot(win_summary2, aes(x = wind_class, y = cv_b)) +
+  geom_boxplot(outliers = FALSE) +
+  labs(
+    x = "Mean wind speed class",
+    y = "CV of LTI over projection angles"
+  ) +
+  theme_bw()
+
+
+# win_summary に平均風速階級を付与
+win_summary2 <- win_summary %>%
+  mutate(window = as.numeric(window)) %>%
+  left_join(
+    wind_class_df %>%
+      mutate(window = as.numeric(window)) %>%
+      select(window, mean_speed, wind_class),
+    by = "window"
+  )
+
+# 平均風速階級別の射影角依存性指標
+table_angle_dependence <- win_summary2 %>%
+  group_by(wind_class) %>%
+  summarise(
+    n_win = n(),
+    mean_speed_median = median(mean_speed, na.rm = TRUE),
+    
+    cv_median = median(cv_b, na.rm = TRUE),
+    cv_p95    = quantile(cv_b, 0.95, na.rm = TRUE),
+    
+    ratio_maxmin_median = median(ratio_maxmin, na.rm = TRUE),
+    ratio_maxmin_p95    = quantile(ratio_maxmin, 0.95, na.rm = TRUE),
+    
+    .groups = "drop"
+  ) %>%
+  mutate(
+    wind_class = as.character(wind_class)
+  )
+
+################ Table 2 ###############
+table_angle_dependence
+
+################# 参考　旧Fig2 全てをまとめた図################
 ggplot(b_df, aes(x = factor(angle), y = b)) +
   geom_boxplot() +
   labs(
@@ -3330,8 +3468,3 @@ df_roll_fit <- df_flight_cut_case %>%
 df_roll_fit
 
 # 
-
-
-
-
-
